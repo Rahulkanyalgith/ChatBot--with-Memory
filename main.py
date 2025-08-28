@@ -69,7 +69,7 @@ def main():
         st.subheader("Model Selection")
         model = st.selectbox(
             'Choose your model:',
-            ['mixtral-8x7b-32768', 'llama2-70b-4096'],
+            ['deepseek-r1-distill-llama-70b', 'meta-llama/llama-guard-4-12b'],
             help="Select the AI model for your conversation"
         )
         
