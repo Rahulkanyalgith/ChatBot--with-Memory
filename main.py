@@ -1,6 +1,5 @@
 import streamlit as st
 import os
-from groq import Groq
 from datetime import datetime
 from langchain.chains import ConversationChain
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory
@@ -19,6 +18,28 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# --- Custom CSS for UI polish ---
+st.markdown("""
+    <style>
+    /* Main Title */
+    h1 {text-align: center; font-size: 2.2rem; margin-bottom: 15px; color: #333;}
+    
+    /* Sidebar */
+    .css-1d391kg {background: #f7f9fc;}
+    .sidebar .sidebar-content {padding: 20px;}
+    
+    /* Chat Bubbles */
+    .user-msg {background-color: #DCF8C6; padding: 12px; border-radius: 12px; margin: 5px 0; text-align: right;}
+    .ai-msg {background-color: #F1F0F0; padding: 12px; border-radius: 12px; margin: 5px 0; text-align: left;}
+    
+    /* Metrics */
+    .stMetric {background: #f5f5f5; padding: 10px; border-radius: 8px;}
+    
+    /* Buttons */
+    div.stButton > button {border-radius: 10px; font-weight: 600;}
+    </style>
+""", unsafe_allow_html=True)
 
 def initialize_session_state():
     """Initialize session state variables"""
@@ -63,34 +84,31 @@ def main():
     
     # Sidebar Configuration
     with st.sidebar:
-        st.title("🛠️ Chat Settings")
+        st.title("⚙️ Chat Settings")
         
-        # Model selection with custom styling
-        st.subheader("Model Selection")
-        model = st.selectbox(
-            'Choose your model:',
-            ['deepseek-r1-distill-llama-70b', 'meta-llama/llama-guard-4-12b'],
-            help="Select the AI model for your conversation"
-        )
+        with st.expander("🤖 Model Selection", expanded=True):
+            model = st.selectbox(
+                'Choose your model:',
+                ['deepseek-r1-distill-llama-70b', 'meta-llama/llama-guard-4-12b'],
+                help="Select the AI model for your conversation"
+            )
         
-        # Memory configuration
-        st.subheader("Memory Settings")
-        memory_length = st.slider(
-            'Conversation Memory (messages)',
-            1, 10, 5,
-            help="Number of previous messages to remember"
-        )
+        with st.expander("🧠 Memory Settings", expanded=True):
+            memory_length = st.slider(
+                'Conversation Memory (messages)',
+                1, 30, 10,
+                help="Number of previous messages to remember"
+            )
         
-        # Persona selection
-        st.subheader("AI Persona")
-        st.session_state.selected_persona = st.selectbox(
-            'Select conversation style:',
-            ['Default', 'Expert', 'Creative']
-        )
+        with st.expander("🎭 AI Persona", expanded=True):
+            st.session_state.selected_persona = st.selectbox(
+                'Select conversation style:',
+                ['Default', 'Expert', 'Creative']
+            )
         
         # Chat statistics
         if st.session_state.start_time:
-            st.subheader("📊 Chat Statistics")
+            st.markdown("### 📊 Chat Statistics")
             col1, col2 = st.columns(2)
             with col1:
                 st.metric("Messages", len(st.session_state.chat_history))
@@ -98,49 +116,28 @@ def main():
                 duration = datetime.now() - st.session_state.start_time
                 st.metric("Duration", f"{duration.seconds // 60}m {duration.seconds % 60}s")
         
-        # Clear chat button
+        st.markdown("---")
         if st.button("🗑️ Clear Chat History", use_container_width=True):
             st.session_state.chat_history = []
             st.session_state.start_time = None
             st.rerun()
 
-    # Main chat interface
+    # --- Main chat interface ---
     st.title("🤖 Groq Chat Assistant")
-    
+
     # Initialize chat components
     memory = ConversationBufferWindowMemory(k=memory_length)
-    groq_chat = ChatGroq(
-        groq_api_key=groq_api_key,
-        model_name=model
-    )
-    
-    conversation = ConversationChain(
-        llm=groq_chat,
-        memory=memory,
-        prompt=get_custom_prompt()
-    )
+    groq_chat = ChatGroq(groq_api_key=groq_api_key, model_name=model)
+    conversation = ConversationChain(llm=groq_chat, memory=memory, prompt=get_custom_prompt())
 
     # Load chat history into memory
     for message in st.session_state.chat_history:
-        memory.save_context(
-            {'input': message['human']},
-            {'output': message['AI']}
-        )
+        memory.save_context({'input': message['human']}, {'output': message['AI']})
 
-    # Display chat history
+    # Display chat history with custom bubbles
     for message in st.session_state.chat_history:
-        # User message
-        with st.container():
-            st.write(f"👤 You")
-            st.info(message['human'])
-        
-        # AI response
-        with st.container():
-            st.write(f"🤖 Assistant ({st.session_state.selected_persona} mode)")
-            st.success(message['AI'])
-        
-        # Add some spacing
-        st.write("")
+        st.markdown(f"<div class='user-msg'>👤 {message['human']}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='ai-msg'>🤖 {message['AI']}</div>", unsafe_allow_html=True)
 
     # User input section
     st.markdown("### 💭 Your Message")
@@ -148,8 +145,7 @@ def main():
         "",
         height=100,
         placeholder="Type your message here... (Shift + Enter to send)",
-        key="user_input",
-        help="Type your message and press Shift + Enter or click the Send button"
+        key="user_input"
     )
 
     # Input buttons
@@ -168,10 +164,7 @@ def main():
         with st.spinner('🤔 Thinking...'):
             try:
                 response = conversation(user_question)
-                message = {
-                    'human': user_question,
-                    'AI': response['response']
-                }
+                message = {'human': user_question, 'AI': response['response']}
                 st.session_state.chat_history.append(message)
                 st.rerun()
             except Exception as e:
@@ -180,9 +173,7 @@ def main():
     # Footer
     st.markdown("---")
     st.markdown(
-        "Using Groq AI with "
-        f"{st.session_state.selected_persona.lower()} persona | "
-        f"Memory: {memory_length} messages"
+        f"🌐 Powered by **Groq AI + LangChain** | Persona: *{st.session_state.selected_persona}* | Memory: *{memory_length} messages*"
     )
 
 if __name__ == "__main__":
